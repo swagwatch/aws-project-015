@@ -2,9 +2,9 @@
 
 terraform {
   backend "s3" {
-    bucket         = "BUCKETNAME-ue1"
-    key            = "BUCKETNAME-ue1/PROJECTNAME/dev/tf.state"
+    bucket         = "swagwatch-ue1"
+    key            = "swatch-ue1/aws-project-007/dev/tf.state"
     region         = "us-east-1"
-    dynamodb_table = "BUCKETNAME-ue1-PROJECTNAME-dev"
+    dynamodb_table = "swagwatch-ue1-aws-project-007-dev"
   }
 }

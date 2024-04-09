@@ -9,8 +9,8 @@ environment = "development"
 #
 common_tags = {
   environment = "development"
-  project     = "project-name"
-  owner       = "owner-name"
+  project     = "aws-project-015"
+  owner       = "cloudgods"
 }
 #--------------------------------------------------------------------------
 
