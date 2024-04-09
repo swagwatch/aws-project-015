@@ -1,0 +1,29 @@
+---
+name: "tagged-release"
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+
+  tagged-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      
+      - name: Switch to Current Branch
+        run: git checkout ${{ env.BRANCH }}
+      
+      - name: Create Tagged - Release
+        id: semver
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.CROSS_REPO_TOKEN }}"
+          prerelease: false

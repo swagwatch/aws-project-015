@@ -1,0 +1,132 @@
+name: cycle-dev-node
+
+on:
+  workflow_dispatch:
+    inputs:
+      node:
+        description: "EKS Node Name"
+
+jobs:
+
+  build-dev-addon-matrix:
+
+    name: build-dev-addon-matrix
+    runs-on: ubuntu-latest
+
+    env:
+      WORKSPACE: 'dev'
+      AWS_REGION: 'us-east-1'
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_K_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S_ID }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+          token: ${{ secrets.CROSS_REPO_TOKEN }} # Needed for private submodules
+      
+      - name: Build Workspace / Environment
+        id: build-environment
+        run: |
+          cd environments/$WORKSPACE/.onekloud_init
+          make
+          ls -la
+
+      - name: Set Matrix
+        id: set-matrix
+        run: |
+          cd environments/$WORKSPACE/Addons-EKS/.onekloud_init
+          make
+          CLUSTERS=$(cat eks_clusters.json)
+          echo "cluster_matrix=$CLUSTERS" >> $GITHUB_OUTPUT
+    outputs:
+      cluster_matrix: ${{ steps.set-matrix.outputs.cluster_matrix }}
+
+
+
+
+  cycle-dev-eks-cluster-node:
+    needs: build-dev-addon-matrix
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: ${{ fromJson(needs.build-dev-addon-matrix.outputs.cluster_matrix) }}
+
+    name: ${{ matrix.cluster }} [REMOVE NODE]
+    runs-on: ubuntu-latest
+
+    env:
+      WORKSPACE: 'dev'
+      AWS_REGION: 'us-east-1'
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_K_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S_ID }}
+
+    steps:
+      
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+          token: ${{ secrets.CROSS_REPO_TOKEN }} # Needed for private submodules
+
+      - name: Build Workspace / Environment
+        id: build-environment
+        run: |
+          cd environments/$WORKSPACE/.onekloud_init
+          make
+          ls -la ../
+          cat ../terraform.tfvars
+
+      - name: Setup AWSCli
+        id: install-aws-cli
+        uses: unfor19/install-aws-cli-action@v1.0.6
+        with:
+          version: 2     # default
+          verbose: false # default
+          arch: amd64    # allowed values: amd64, arm64
+      
+      - name: Setup K8S tools
+        id: k8s-tools
+        uses: yokawasa/action-setup-kube-tools@v0.9.3
+
+      - name: Verify K8s tool versions
+        id: k8s-tool-versions
+        run: |
+          kubectl version --client
+          helm version
+
+      - name: Authenticate To EKS
+        id: eks-auth
+        env:
+          EKS_CLUSTER_NAME: ${{ matrix.cluster }}
+        run: |
+          aws eks update-kubeconfig --name=$EKS_CLUSTER_NAME
+          kubectl get -n kube-system configmap/aws-auth -o yaml
+      
+      - name: Remove Dev Node
+        id: remove-dev-node
+        run: |
+          # Cordon Node
+          echo "Cordoning Node: ${{ github.event.inputs.node }}"
+          kubectl cordon ${{ github.event.inputs.node }}
+
+          # Drain Node
+          echo "Draining Node: ${{ github.event.inputs.node }}"
+          kubectl drain ${{ github.event.inputs.node }} --delete-emptydir-data --ignore-daemonsets --force
+
+          # Delete Node
+          echo "Deleting Node: ${{ github.event.inputs.node }}"
+          kubectl delete node ${{ github.event.inputs.node }}
+
+          # Get Node Instance ID
+          echo "Getting Instance ID for Node: ${{ github.event.inputs.node }}"
+          NODEID=$(aws ec2 --region=us-east-1 describe-instances --filter Name=private-dns-name,Values=${{ github.event.inputs.node }} --no-cli-pager |jq -r ".Reservations[0].Instances[0].InstanceId")
+
+          # Remove Node From Autoscaling Group
+          echo "Removing Node ${{ github.event.inputs.node }} From Autoscaling Group at Instance ID: ${NODEID}"
+          aws autoscaling --region=us-east-1 terminate-instance-in-auto-scaling-group --instance-id ${NODEID} --no-should-decrement-desired-capacity --no-cli-pager
+
+          echo "Removed Node: ${{ github.event.inputs.node }} at Instance ID: ${NODEID} from ${EKS_CLUSTER_NAME}"

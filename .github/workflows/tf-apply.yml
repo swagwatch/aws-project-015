@@ -1,0 +1,462 @@
+name: terraform-apply
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+
+  terraform-apply-dev:
+    # Only run for comments starting with "terraform apply dev" in a pull request.
+    if: >
+      startsWith(github.event.comment.body, 'terraform apply dev')
+      && startsWith(github.event.issue.pull_request.url, 'https://')
+  
+    name: terraform-apply-dev
+    runs-on: ubuntu-latest
+
+    env:
+      WORKSPACE: 'dev'
+      AWS_REGION: 'us-east-1'
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_K_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S_ID }}
+      # CHECKOV_API_KEY: ${{ secrets.CHECKOV_API_KEY }}
+    
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 'Load PR Details'
+        id: load-pr
+        run: |
+          set -eu
+          echo ${{ github.event.issue.pull_request.url }}
+          echo ${{ secrets.CROSS_REPO_TOKEN }}
+          resp=$(curl -sSf \
+            --url ${{ github.event.issue.pull_request.url }} \
+            --header 'Authorization: Bearer ${{ secrets.CROSS_REPO_TOKEN }}' \
+            --header 'Accept: application/vnd.github+json')
+          sha=$(jq -r '.head.sha' <<< "$resp")
+          echo "head_sha=$sha" >> $GITHUB_OUTPUT
+          comments_url=$(jq -r '.comments_url' <<< "$resp")
+          echo "comments_url=$comments_url" >> $GITHUB_OUTPUT
+      
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          # By default (in a non-pull request build) you get HEAD of 'master'
+          ref: ${{ steps.load-pr.outputs.head_sha }}
+          submodules: 'true'
+          token: ${{ secrets.GITHUB_TOKEN }} # Needed for private submodules
+      
+      - name: Build Workspace / Environment
+        id: build-environment
+        run: |
+          cd environments/$WORKSPACE/.onekloud_init
+          make
+          ls -la ../
+          cat ../terraform.tfvars
+
+      - name: Setup AWSCli
+        id: install-aws-cli
+        uses: unfor19/install-aws-cli-action@v1.0.6
+        with:
+          version: 2     # default
+          verbose: false # default
+          arch: amd64    # allowed values: amd64, arm64
+      
+      - name: Setup Terraform
+        id: terraform-setup
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.1
+          terraform_wrapper: false
+      
+      - name: terraform init
+        id: terraform-init
+        run: terraform -chdir=environments/$WORKSPACE init
+      
+      - name: terraform format
+        id: terraform-format
+        run: terraform -chdir=environments/$WORKSPACE fmt -check -diff
+      
+      - name: terraform validate
+        id: terraform-validate
+        run: terraform -chdir=environments/$WORKSPACE validate
+      
+      - name: terraform plan
+        id: terraform-plan
+        run: |
+          set -eu
+          terraform -chdir=environments/$WORKSPACE plan
+          terraform_plan_out=$(terraform -chdir=environments/$WORKSPACE plan -no-color -out tfplan.binary)
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "tf_plan_out<<$EOF" >> $GITHUB_OUTPUT
+          echo "$terraform_plan_out" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+      
+      - name: Convert Terraform Plan To JSON
+        id: terraform-json
+        run: terraform -chdir=environments/$WORKSPACE show -json tfplan.binary | jq -r '.' > tfplan.json
+      
+      - name: Setup OPA
+        id: setup-opa
+        uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+      
+      - name: Validate Terraform Plan Against OPA GENERAL [ WARN ] rules
+        id: validate-opa-warn
+        run: opa exec --bundle environments/$WORKSPACE/opa-policies --decision general/warn tfplan.json | jq -r '.result[0].result'
+      
+      - name: Validate Terraform Plan Against OPA GENERAL [ DENY ] rules
+        id: validate-opa-deny
+        run: |
+          opa exec --bundle environments/$WORKSPACE/opa-policies --decision general/deny tfplan.json | jq -r '.result[0].result'
+          has_failures=$(opa exec --bundle environments/$WORKSPACE/opa-policies --decision general/deny tfplan.json | jq -r '.result[0].result[0]')
+          if [[ $has_failures == *"GENERAL"* ]]
+          then
+             exit 1
+          fi
+      
+      - name: Install PIP3
+        id: install-pip3
+        run: |
+          sudo apt-get -y install python3-pip
+      
+      - name: Install Checkov
+        id: install-checkov
+        run: pip3 install checkov
+      
+      - name: Static Code Security Analysis
+        id: run-checkov
+        run: checkov -f tfplan.json -s --quiet # --bc-api-key $CHECKOV_API_KEY
+      
+      - name: terraform apply
+        id: terraform-apply
+        run: |
+          set -eu
+          terraform_apply_out=$(terraform -chdir=environments/$WORKSPACE apply tfplan.binary)
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "tf_apply_out<<$EOF" >> $GITHUB_OUTPUT
+          echo "$terraform_apply_out" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+
+
+
+  build-dev-addon-matrix:
+    needs: terraform-apply-dev
+    # Only run for comments starting with "terraform apply dev" in a pull request.
+    if: >
+      startsWith(github.event.comment.body, 'terraform apply dev')
+      && startsWith(github.event.issue.pull_request.url, 'https://')
+
+    name: build-dev-addon-matrix
+    runs-on: ubuntu-latest
+
+    env:
+      WORKSPACE: 'dev'
+      AWS_REGION: 'us-east-1'
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_K_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S_ID }}
+
+    steps:
+
+      - name: 'Load PR Details'
+        id: load-pr
+        run: |
+          set -eu
+          echo ${{ github.event.issue.pull_request.url }}
+          echo ${{ secrets.CROSS_REPO_TOKEN }}
+          resp=$(curl -sSf \
+            --url ${{ github.event.issue.pull_request.url }} \
+            --header 'Authorization: Bearer ${{ secrets.CROSS_REPO_TOKEN }}' \
+            --header 'Accept: application/vnd.github+json')
+          sha=$(jq -r '.head.sha' <<< "$resp")
+          echo "head_sha=$sha" >> $GITHUB_OUTPUT
+          comments_url=$(jq -r '.comments_url' <<< "$resp")
+          echo "comments_url=$comments_url" >> $GITHUB_OUTPUT
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # By default (in a non-pull request build) you get HEAD of 'master'
+          ref: ${{ steps.load-pr.outputs.head_sha }}
+          submodules: 'true'
+          token: ${{ secrets.CROSS_REPO_TOKEN }} # Needed for private submodules
+      
+      - name: Build Workspace / Environment
+        id: build-environment
+        run: |
+          cd environments/$WORKSPACE/.onekloud_init
+          make
+          ls -la
+
+      - name: Set Matrix
+        id: set-matrix
+        run: |
+          cd environments/$WORKSPACE/Addons-EKS/.onekloud_init
+          make
+          CLUSTERS=$(cat eks_clusters.json)
+          echo "cluster_matrix=$CLUSTERS" >> $GITHUB_OUTPUT
+    outputs:
+      cluster_matrix: ${{ steps.set-matrix.outputs.cluster_matrix }}
+
+
+
+
+  install-dev-cluster-addons-parallel:
+    needs: build-dev-addon-matrix
+    # Only run for comments starting with "terraform apply dev" in a pull request.
+    if: >
+      startsWith(github.event.comment.body, 'terraform apply dev')
+      && startsWith(github.event.issue.pull_request.url, 'https://')
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: ${{ fromJson(needs.build-dev-addon-matrix.outputs.cluster_matrix) }}
+
+    name: ${{ matrix.cluster }} [Install Addons]
+    runs-on: ubuntu-latest
+
+    env:
+      WORKSPACE: 'dev'
+      AWS_REGION: 'us-east-1'
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_K_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S_ID }}
+
+    steps:
+
+      - name: 'Load PR Details'
+        id: load-pr
+        run: |
+          set -eu
+          echo ${{ github.event.issue.pull_request.url }}
+          echo ${{ secrets.CROSS_REPO_TOKEN }}
+          resp=$(curl -sSf \
+            --url ${{ github.event.issue.pull_request.url }} \
+            --header 'Authorization: Bearer ${{ secrets.CROSS_REPO_TOKEN }}' \
+            --header 'Accept: application/vnd.github+json')
+          sha=$(jq -r '.head.sha' <<< "$resp")
+          echo "head_sha=$sha" >> $GITHUB_OUTPUT
+          comments_url=$(jq -r '.comments_url' <<< "$resp")
+          echo "comments_url=$comments_url" >> $GITHUB_OUTPUT
+      
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # By default (in a non-pull request build) you get HEAD of 'master'
+          ref: ${{ steps.load-pr.outputs.head_sha }}
+          submodules: 'true'
+          token: ${{ secrets.CROSS_REPO_TOKEN }} # Needed for private submodules
+
+      - name: Build Workspace / Environment
+        id: build-environment
+        run: |
+          cd environments/$WORKSPACE/.onekloud_init
+          make
+          ls -la ../
+          cat ../terraform.tfvars
+
+      - name: Setup AWSCli
+        id: install-aws-cli
+        uses: unfor19/install-aws-cli-action@v1.0.6
+        with:
+          version: 2     # default
+          verbose: false # default
+          arch: amd64    # allowed values: amd64, arm64
+      
+      - name: Setup K8S tools
+        id: k8s-tools
+        uses: yokawasa/action-setup-kube-tools@v0.9.3
+
+      - name: Verify K8s tool versions
+        id: k8s-tool-versions
+        run: |
+          kubectl version --client
+          helm version
+
+      - name: Install eksctl
+        id: eksctl-cmd
+        run: |
+          curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
+          eksctl version
+
+      - name: Setup Terraform
+        id: terraform-setup
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.1
+          terraform_wrapper: false
+
+      - name: terraform init
+        id: terraform-init
+        run: terraform -chdir=environments/$WORKSPACE init
+      
+      - name: terraform format
+        id: terraform-format
+        run: terraform -chdir=environments/$WORKSPACE fmt -check -diff
+
+      - name: terraform validate
+        id: terraform-validate
+        run: terraform -chdir=environments/$WORKSPACE validate
+
+      - name: Authenticate To EKS
+        id: eks-auth
+        env:
+          EKS_CLUSTER_NAME: ${{ matrix.cluster }}
+        run: |
+          aws eks update-kubeconfig --name=$EKS_CLUSTER_NAME
+          kubectl get -n kube-system configmap/aws-auth -o yaml
+
+
+
+      - name: Get CNI Plugin Migration Phase 1 Parameters
+        id: cni-migration-first-phase-params
+        run: |
+          EKS_CLUSTER_NAME=${{ matrix.cluster }}
+          echo "EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+          ADDON_ENABLED=$( terraform -chdir=environments/$WORKSPACE output -json addon_migrate_from_vpc_cni_to_cilium_pass_1 |jq -r '."${{ matrix.cluster }}"' |jq -r .addon_enabled )
+          echo "ADDON_ENABLED=$ADDON_ENABLED" >> $GITHUB_OUTPUT
+
+      - name: Prepare EKS Cluster For Phase 1 CNI Migration 
+        id: cni-migration-first-phase-configure
+        env:
+          EKS_CLUSTER_NAME: ${{ steps.cni-migration-first-phase-params.outputs.EKS_CLUSTER_NAME }}
+          ADDON_ENABLED: ${{ steps.cni-migration-first-phase-params.outputs.ADDON_ENABLED }}
+        run: |
+          echo $EKS_CLUSTER_NAME
+          echo $ADDON_ENABLED
+          bash environments/$WORKSPACE/Addons-EKS/kube/addon_migrate_from_vpc_cni_to_cilium_pass_1/deploy.sh $EKS_CLUSTER_NAME $ADDON_ENABLED
+
+
+
+      - name: Get CNI Plugin Migration Phase 2 Parameters
+        id: cni-migration-second-phase-params
+        run: |
+          EKS_CLUSTER_NAME=${{ matrix.cluster }}
+          echo "EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+          ADDON_ENABLED=$( terraform -chdir=environments/$WORKSPACE output -json addon_migrate_from_vpc_cni_to_cilium_pass_2 |jq -r '."${{ matrix.cluster }}"' |jq -r .addon_enabled )
+          echo "ADDON_ENABLED=$ADDON_ENABLED" >> $GITHUB_OUTPUT
+
+      - name: Prepare EKS Cluster For Phase 2 CNI Migration 
+        id: cni-migration-second-phase-configure
+        env:
+          EKS_CLUSTER_NAME: ${{ steps.cni-migration-second-phase-params.outputs.EKS_CLUSTER_NAME }}
+          ADDON_ENABLED: ${{ steps.cni-migration-second-phase-params.outputs.ADDON_ENABLED }}
+        run: |
+          echo $EKS_CLUSTER_NAME
+          echo $ADDON_ENABLED
+          bash environments/$WORKSPACE/Addons-EKS/kube/addon_migrate_from_vpc_cni_to_cilium_pass_2/deploy.sh $EKS_CLUSTER_NAME $ADDON_ENABLED
+
+
+
+      - name: Get EBS CSI Driver Parameters
+        id: ebs-params
+        run: |
+          EKS_CLUSTER_NAME=${{ matrix.cluster }}
+          echo "EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+          ADDON_ENABLED=$( terraform -chdir=environments/$WORKSPACE output -json addon_ebs_csi |jq -r '."${{ matrix.cluster }}"' |jq -r .addon_enabled )
+          echo "ADDON_ENABLED=$ADDON_ENABLED" >> $GITHUB_OUTPUT
+
+      - name: Install EBS CSI Driver
+        id: install-ebs
+        env:
+          EKS_CLUSTER_NAME: ${{ steps.ebs-params.outputs.EKS_CLUSTER_NAME }}
+          ADDON_ENABLED: ${{ steps.ebs-params.outputs.ADDON_ENABLED }}
+        run: |
+          echo $EKS_CLUSTER_NAME
+          echo $ADDON_ENABLED
+          bash environments/$WORKSPACE/Addons-EKS/kube/addon_ebs_csi/deploy.sh $EKS_CLUSTER_NAME $ADDON_ENABLED
+
+
+
+      - name: Get Cert Manager Parameters
+        id: certmanager-params
+        run: |
+          EKS_CLUSTER_NAME=${{ matrix.cluster }}
+          echo "EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+          ADDON_ENABLED=$( terraform -chdir=environments/$WORKSPACE output -json addon_cert_manager |jq -r '."${{ matrix.cluster }}"' |jq -r .addon_enabled )
+          echo "ADDON_ENABLED=$ADDON_ENABLED" >> $GITHUB_OUTPUT
+
+      - name: Install Cert Manager Objects
+        id: install-certmanager
+        env:
+          EKS_CLUSTER_NAME: ${{ steps.certmanager-params.outputs.EKS_CLUSTER_NAME }}
+          ADDON_ENABLED: ${{ steps.certmanager-params.outputs.ADDON_ENABLED }}
+        run: |
+          echo $EKS_CLUSTER_NAME
+          echo $ADDON_ENABLED
+          bash environments/$WORKSPACE/Addons-EKS/kube/addon_cert_manager/deploy.sh $EKS_CLUSTER_NAME $ADDON_ENABLED
+
+
+
+      - name: Get Ingress Parameters
+        id: ingress-params
+        run: |
+          EKS_CLUSTER_NAME=${{ matrix.cluster }}
+          echo "EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+          ADDON_ENABLED=$( terraform -chdir=environments/$WORKSPACE output -json addon_argocd_app_ingresses |jq -r '."${{ matrix.cluster }}"' |jq -r .addon_enabled )
+          echo "ADDON_ENABLED=$ADDON_ENABLED" >> $GITHUB_OUTPUT
+
+      - name: Install Ingresses
+        id: install-ingresses
+        env:
+          EKS_CLUSTER_NAME: ${{ steps.ingress-params.outputs.EKS_CLUSTER_NAME }}
+          ADDON_ENABLED: ${{ steps.ingress-params.outputs.ADDON_ENABLED }}
+        run: |
+          echo $EKS_CLUSTER_NAME
+          echo $ADDON_ENABLED
+          bash environments/$WORKSPACE/Addons-EKS/kube/addon_argocd_app_ingresses/deploy.sh $EKS_CLUSTER_NAME $ADDON_ENABLED
+
+
+      - name: Get ArgoCD Project Parameters
+        id: argoproj-params
+        run: |
+          EKS_CLUSTER_NAME=${{ matrix.cluster }}
+          echo "EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+          ADDON_ENABLED=$( terraform -chdir=environments/$WORKSPACE output -json addon_argocd_projects |jq -r '."${{ matrix.cluster }}"' |jq -r .addon_enabled )
+          echo "ADDON_ENABLED=$ADDON_ENABLED" >> $GITHUB_OUTPUT
+
+      - name: Install ArgoCD Projects
+        id: install-argoproj
+        env:
+          EKS_CLUSTER_NAME: ${{ steps.argoproj-params.outputs.EKS_CLUSTER_NAME }}
+          ADDON_ENABLED: ${{ steps.argoproj-params.outputs.ADDON_ENABLED }}
+        run: |
+          echo $EKS_CLUSTER_NAME
+          echo $ADDON_ENABLED
+          bash environments/$WORKSPACE/Addons-EKS/kube/addon_argocd_projects/deploy.sh $EKS_CLUSTER_NAME $ADDON_ENABLED
+
+
+      - name: Get ArgoCD App Parameters
+        id: argoapp-params
+        run: |
+          EKS_CLUSTER_NAME=${{ matrix.cluster }}
+          echo "EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+          ADDON_ENABLED=$( terraform -chdir=environments/$WORKSPACE output -json addon_argocd_apps |jq -r '."${{ matrix.cluster }}"' |jq -r .addon_enabled )
+          echo "ADDON_ENABLED=$ADDON_ENABLED" >> $GITHUB_OUTPUT
+
+      - name: Install ArgoCD Applications
+        id: install-argoapp
+        env:
+          EKS_CLUSTER_NAME: ${{ steps.argoapp-params.outputs.EKS_CLUSTER_NAME }}
+          ADDON_ENABLED: ${{ steps.argoapp-params.outputs.ADDON_ENABLED }}
+        run: |
+          echo $EKS_CLUSTER_NAME
+          echo $ADDON_ENABLED
+          bash environments/$WORKSPACE/Addons-EKS/kube/addon_argocd_apps/deploy.sh $EKS_CLUSTER_NAME $ADDON_ENABLED
