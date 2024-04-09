@@ -42,7 +42,7 @@ cert_manager_registered_email = "cloud.native.system@gmail.com"
 
 addon_cilium_cni_enabled = true
 
-addon_ekscore_enabled = false
+addon_ekscore_enabled = true
 
 addon_storage_enabled = false
 
