@@ -46,7 +46,7 @@ addon_ekscore_enabled = true
 
 addon_storage_enabled = true
 
-addon_networking_enabled = false
+addon_networking_enabled = true
 
 addon_sdlc_enabled = false
 
