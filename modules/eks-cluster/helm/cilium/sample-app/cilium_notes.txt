@@ -1,0 +1,90 @@
+#-----------------------------------------------------
+# CILIUM NOTES
+#-----------------------------------------------------
+
+[ Use Cilium Cli on Data Node ]
+
+Find nodes running cilium
+* kubectl get pods -o wide -n kube-system|grep cilium
+
+Exec into Pod
+* kubectl exec -it cilium-bw8xg -n kube-system -c cilium-agent -- /bin/bash # config container is another option
+* cilium
+
+[Mutual  Authentication]
+
+Verify SPIRE Health
+* kubectl get all -n cilium-spire
+
+Run a healthcheck on the SPIRE server
+* kubectl exec -n cilium-spire spire-server-0 -c spire-server -- /opt/spire/bin/spire-server healthcheck
+
+Verify the list of attested agents:
+* kubectl exec -n cilium-spire spire-server-0 -c spire-server -- /opt/spire/bin/spire-server agent list
+
+Verify that the Cilium agent and operator have Identities on the SPIRE server:
+* kubectl exec -n cilium-spire spire-server-0 -c spire-server -- /opt/spire/bin/spire-server entry show -parentID spiffe://spiffe.cilium/ns/cilium-spire/sa/spire-agent
+
+Get all registered entries:
+* kubectl exec -n cilium-spire spire-server-0 -c spire-server -- /opt/spire/bin/spire-server entry show
+* kubectl exec -n cilium-spire spire-server-0 -c spire-server -- /opt/spire/bin/spire-server entry show -selector cilium:mutual-auth
+* kubectl get ciliumidentities
+
+Verify Mutual Authentication:
+* cilium config set debug true
+* Examine the logs on the Cilium agent located in the same node as the <xxx> Pod. For brevity, you can search for some specific log messages
+* kubectl -n kube-system -c cilium-agent logs <cilium-9pshw> --timestamps=true | grep "Policy is requiring authentication\|Validating Server SNI\|Validated certificate\|Successfully authenticated"
+
+Reference:
+* https://github.com/cilium/design-cfps/blob/main/cilium/CFP-22215-mutual-auth-for-service-mesh.md
+* https://docs.cilium.io/en/latest/network/servicemesh/mutual-authentication/mutual-authentication/
+* https://docs.cilium.io/en/latest/network/servicemesh/mutual-authentication/mutual-authentication-example/
+
+
+
+
+
+#-----------------------------------------------------
+# CILIUM COMMANDS CHEATSHEAT
+#-----------------------------------------------------
+
+cilium stat
+cilium connectivity test
+cilium connectivity perf --namespace <ns>
+cilium hubble port-forward
+cilium hubble ui
+
+
+
+#-----------------------------------------------------
+# HUBBLE COMMANDS CHEATSHEAT
+#-----------------------------------------------------
+
+[All Traffic]
+hubble observe flows --pod namespace/pod
+
+hubble observe flows --pod namespace/pod --follow
+
+[All Incoming Traffic]
+hubble observe flows --pod namespace/pod --traffic-direction ingress --protocol tcp --to-port 8000 --follow
+
+[Outgoing DNS Traffic]
+hubble observe flows --pod namespace/pod --traffic-direction egress --protocol udp --to-port 53 --follow
+
+[Outgoing Web Traffic]
+hubble observe flows --pod namespace/pod --traffic-direction egress --protocol tcp --to-port 443 --follow
+
+[Outgoing Web Traffic To Micro-Service Endpoints]
+hubble observe flows --pod namespace/pod --traffic-direction egress --protocol tcp --to-port 8000 --follow
+
+[Resulting Verdict [FORWARDED, DROPPED, AUDIT, REDIRECTED, ERROR, TRACED, TRANSLATED] ]
+--verdict
+
+[Show Results From Policy Action]
+--type policy-verdict
+
+Reference:
+* https://isovalent.com/blog/post/cilium-hubble-cheat-sheet-observability/
+* https://isovalent.wpengine.com/wp-content/uploads/2023/08/Cilium-Hubble-Cheat-Sheet.png
+* https://isovalent.com/blog/post/hubble-series-re-introducing-hubble/
+* https://isovalent.com/blog/post/cilium-hubble-with-grafana/

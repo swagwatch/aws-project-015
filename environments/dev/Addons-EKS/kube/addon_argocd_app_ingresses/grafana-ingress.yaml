@@ -1,0 +1,21 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: nginx-public
+spec:
+  rules:
+    # REPLACE WITH REAL PUBLIC DOMAIN
+    - host: grafana-public.example.com
+      http:
+        paths:
+          - pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 80
+            path: /

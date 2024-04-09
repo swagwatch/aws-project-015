@@ -1,0 +1,83 @@
+controller:
+  ingressClassResource:
+    name: nginx-public
+  ingressClass: nginx-public
+  podAnnotations:
+    ad.datadoghq.com/nginx-ingress-controller.check_names: '["nginx_ingress_controller"]'
+    ad.datadoghq.com/nginx-ingress-controller.init_configs: '[{}]'
+    ad.datadoghq.com/nginx-ingress-controller.instances: '[{"prometheus_url": "http://%%host%%:10254/metrics"}]'
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: "10254"
+  service:
+    enableHttp: false  # Disables creation of an HTTP listener on the NLB
+    targetPorts:
+      http: http
+      https: http
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+      service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+      service.beta.kubernetes.io/aws-load-balancer-ssl-cert:
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: 'true'
+      service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy: ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      service.beta.kubernetes.io/aws-load-balancer-type: "external" # was service.beta.kubernetes.io/aws-load-balancer-type: nlb
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+      service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"
+  publishService:
+    enabled: true
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 20
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  terminationGracePeriodSeconds: 300
+  admissionWebhooks:
+    enabled: false
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/instance
+                  operator: In
+                  values:
+                    - nginx-public-ingress
+            topologyKey: failure-domain.beta.kubernetes.io/zone
+          weight: 100
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/instance
+                  operator: In
+                  values:
+                    - nginx-public-ingress
+            topologyKey: kubernetes.io/hostname
+          weight: 75
+  config:
+    custom-http-errors: "404,503"
+    use-proxy-protocol: "true"
+defaultBackend:
+  enabled: true
+  image:
+    registry: registry.k8s.io
+    image: ingress-nginx/nginx-errors
+    tag: "v20231208-4c39e6acc"
+  extraVolumes:
+  - name: custom-error-pages
+    configMap:
+      name: custom-error-pages
+      items:
+      - key: "404"
+        path: "404.html"
+      - key: "503"
+        path: "503.html"
+  extraVolumeMounts:
+  - name: custom-error-pages
+    mountPath: /www

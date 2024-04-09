@@ -1,0 +1,21 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opencost-ingress
+  namespace: opencost
+  annotations:
+    kubernetes.io/ingress.class: nginx-public
+spec:
+  rules:
+    # REPLACE WITH REAL PUBLIC DOMAIN
+    - host: opencost-public.example.com
+      http:
+        paths:
+          - pathType: Prefix
+            backend:
+              service:
+                name: opencost
+                port:
+                  number: 80
+            path: /

@@ -1,0 +1,79 @@
+controller:
+  ingressClassResource:
+    name: nginx-private
+  ingressClass: nginx-private
+  config:
+    http-snippet: |
+      map $request_id $formatted_id {
+        "~*(?<p1>[0-9a-f]{8})(?<p2>[0-9a-f]{4})(?<p3>[0-9a-f]{4})(?<p4>[0-9a-f]{4})(?<p5>.*)$" "${p1}-${p2}-${p3}-${p4}-${p5}";
+      }
+      map $http_x_request_id $req_id {
+        default   "${formatted_id}";
+        ~*        "${http_x_request_id}";
+      }
+  podAnnotations:
+    ad.datadoghq.com/nginx-ingress-controller.check_names: '["nginx_ingress_controller"]'
+    ad.datadoghq.com/nginx-ingress-controller.init_configs: '[{}]'
+    ad.datadoghq.com/nginx-ingress-controller.instances: '[{"prometheus_url": "http://%%host%%:10254/metrics"}]'
+  service:
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: 'true'
+      service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+  publishService:
+    enabled: true
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  terminationGracePeriodSeconds: 300
+  admissionWebhooks:
+    enabled: false
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/instance
+                  operator: In
+                  values:
+                    - nginx-private-ingress
+            topologyKey: failure-domain.beta.kubernetes.io/zone
+          weight: 100
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/instance
+                  operator: In
+                  values:
+                    - nginx-private-ingress
+            topologyKey: kubernetes.io/hostname
+          weight: 75
+  config:
+    custom-http-errors: "404,503"
+defaultBackend:
+  enabled: true
+  image:
+    registry: registry.k8s.io
+    image: ingress-nginx/nginx-errors
+    tag: "v20231208-4c39e6acc"
+  extraVolumes:
+  - name: custom-error-pages
+    configMap:
+      name: custom-error-pages
+      items:
+      - key: "404"
+        path: "404.html"
+      - key: "503"
+        path: "503.html"
+  extraVolumeMounts:
+  - name: custom-error-pages
+    mountPath: /www

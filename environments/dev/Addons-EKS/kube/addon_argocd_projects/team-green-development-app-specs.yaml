@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: team-green-development-app-specs
+  namespace: argo-cd
+  finalizers: 
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Team Green Development Environment Application Specifications
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: team-green
+    server: https://kubernetes.default.svc
+  - namespace: argo-cd
+    server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'

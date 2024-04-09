@@ -1,0 +1,121 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: frontendproxy-service
+  namespace: app-frontend
+spec:
+  endpointSelector:
+    matchLabels:
+      app: frontendproxy-service
+  ingress:
+    - fromEntities:
+        # Allow Worker Nodes to perform Startup, Readiness, and Liveness checks
+        - host
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+          rules:
+            http:
+              - method: "GET"
+                path: "/healthz"
+    - fromEndpoints:
+        # Allow Ingress from application pods in same namespace
+        # Enforce mTLS
+        - {}
+      authentication:
+        mode: "required"
+    - fromEndpoints:
+        # Allow Ingress from NGINX Ingress Controllers
+        # Enforce mTLS
+        - matchLabels:
+            app.kubernetes.io/name: "ingress-nginx"
+          matchExpressions:
+            - key: io.kubernetes.pod.namespace
+              operator: Exists
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+          rules:
+            http:
+              - method: "GET"
+                path: "/"
+              - method: "GET"
+                path: "/serviceuri"
+              - method: "GET"
+                path: "/externalservices"
+              - method: "GET"
+                path: "/ping"
+              - method: "GET"
+                path: "/healthz"
+              - method: "GET"
+                path: "/status"
+              - method: "GET"
+                path: "/id"
+      authentication:
+        mode: "required"
+    - fromEndpoints:
+        # Allow Ingress from application pods in other application namespaces
+        # Enforce mTLS 
+        - matchLabels:
+            author: "ncsa"
+          matchExpressions:
+            - key: io.kubernetes.pod.namespace
+              operator: Exists
+      authentication:
+        mode: "required"
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+          rules:
+            http:
+              - method: "GET"
+                path: "/"
+              - method: "GET"
+                path: "/serviceuri"
+              - method: "GET"
+                path: "/externalservices"
+              - method: "GET"
+                path: "/ping"
+              - method: "GET"
+                path: "/healthz"
+              - method: "GET"
+                path: "/status"
+              - method: "GET"
+                path: "/id"
+  egress:
+    - toEndpoints:
+        # Allow egress to kube-dns
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEndpoints:
+        # Allow egress to pods in same namespace
+        - {}
+    - toEndpoints:
+        # Allow egress to application pods in application namespaces
+        - matchLabels:
+            author: ncsa
+          matchExpressions:
+            - key: io.kubernetes.pod.namespace
+              operator: Exists
+      toPorts:
+        - ports:
+            - port: "8000"
+    - toEntities:
+        - world
+    # - toFQDNs:
+    #     # Allow egress to github.com
+    #     - matchName: github.com
+    #   toPorts:
+    #     - ports:
+    #         - port: "443"
