@@ -215,7 +215,8 @@ resource "helm_release" "cilium" {
     type  = "auto"
   }
 
-  set {
+  # UN-COMMENT TO ENABLE CILIUM MUTUAL AUTHENTICATION
+  /*set {
     name  = "authentication.mutual.spire.enabled"
     value = "true"
     type  = "auto"
@@ -225,7 +226,7 @@ resource "helm_release" "cilium" {
     name  = "authentication.mutual.spire.install.enabled"
     value = "true"
     type  = "auto"
-  }
+  }*/
 
   # UN-COMMENT TO ENABLE CILIUM INGRESS CONTROLLER
   /*set {
