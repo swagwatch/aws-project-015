@@ -1,0 +1,39 @@
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus-server
+      access: proxy
+      isDefault: true
+    - name: Loki
+      type: loki
+      url: http://loki-stack:3100
+      access: proxy
+dashboardProviders:
+  dashboardProviders.yaml:
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      ordId: 1
+      folder: 'K8S'
+      type: file
+      disableDeletion: true
+      editable: false
+      options:
+        path: /var/lib/grafana/dashboards/default
+dashboards:
+  default:
+    k8s_cluster_metrics:
+      gnetId: 3119
+      revision: 1
+      datasource: Prometheus
+    k8s_app_metrics:
+      gnetId: 6417
+      revision: 1
+      datasource: Prometheus
+    k8s_nginx_metrics:
+      gnetId: 14314
+      revision: 1
+      datasource: Prometheus

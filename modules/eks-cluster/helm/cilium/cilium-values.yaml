@@ -1,0 +1,12 @@
+# -- Affinity for cilium-agent.
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            # This limits cilium to node
+            # Without cni-plugin=aws
+            - key: cni-plugin
+              operator: NotIn
+              values:
+                - aws

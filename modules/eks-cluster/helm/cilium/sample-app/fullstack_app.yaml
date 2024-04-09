@@ -1,0 +1,469 @@
+#---------------------------------------------------------------------------------------------------
+# REVIEWS-SERVICE
+#---------------------------------------------------------------------------------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reviews-service
+  namespace: app-reviews
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: reviews-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reviews-service
+  namespace: app-reviews
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reviews-service
+  template:
+    metadata:
+      labels:
+        app: reviews-service
+        author: ncsa
+    spec:
+      serviceAccountName: app-reviews-sa
+      containers:
+        - name: app
+          image: 092291409865.dkr.ecr.us-east-1.amazonaws.com/fullstack/generic-microservice-python:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          env:
+            - name: "SERVICE_NAME"
+              value: "reviews-service"
+            - name: "SERVICE_URI"
+              value: "reviews-service.app-reviews.svc.cluster.local:8000"
+            - name: "AUTHORIZED_EXTERNAL_SERVICES"
+              value: ""
+        - name: crawler
+          # NOTES: kubectl exec -it $POD -n app-reviews -c crawler -- sh
+          image: alpine/curl:8.2.1
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c", "--"]
+          args: ["while true; do sleep 30; done;"]
+#---------------------------------------------------------------------------------------------------
+# PAYMENTS-SERVICE
+#---------------------------------------------------------------------------------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-service
+  namespace: app-payments
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: payments-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-service
+  namespace: app-payments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payments-service
+  template:
+    metadata:
+      labels:
+        app: payments-service
+        author: ncsa
+    spec:
+      serviceAccountName: app-payments-sa
+      containers:
+        - name: app
+          image: 092291409865.dkr.ecr.us-east-1.amazonaws.com/fullstack/generic-microservice-python:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          env:
+            - name: "SERVICE_NAME"
+              value: "payments-service"
+            - name: "SERVICE_URI"
+              value: "payments-service.app-payments.svc.cluster.local:8000"
+            - name: "AUTHORIZED_EXTERNAL_SERVICES"
+              value: ""
+        - name: crawler
+          # NOTES: kubectl exec -it $POD -n app-payments -c crawler -- sh
+          image: alpine/curl:8.2.1
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c", "--"]
+          args: ["while true; do sleep 30; done;"]
+#---------------------------------------------------------------------------------------------------
+# ORDERS-SERVICE
+#---------------------------------------------------------------------------------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-service
+  namespace: app-orders
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: orders-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-service
+  namespace: app-orders
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders-service
+  template:
+    metadata:
+      labels:
+        app: orders-service
+        author: ncsa
+    spec:
+      serviceAccountName: app-orders-sa
+      containers:
+        - name: app
+          image: 092291409865.dkr.ecr.us-east-1.amazonaws.com/fullstack/generic-microservice-python:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          env:
+            - name: "SERVICE_NAME"
+              value: "orders-service"
+            - name: "SERVICE_URI"
+              value: "orders-service.app-orders.svc.cluster.local:8000"
+            - name: "AUTHORIZED_EXTERNAL_SERVICES"
+              value: ""
+        - name: crawler
+          # NOTES: kubectl exec -it $POD -n app-orders -c crawler -- sh
+          image: alpine/curl:8.2.1
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c", "--"]
+          args: ["while true; do sleep 30; done;"]
+#---------------------------------------------------------------------------------------------------
+# SEARCH-SERVICE
+#---------------------------------------------------------------------------------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-service
+  namespace: app-search
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: search-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-service
+  namespace: app-search
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: search-service
+  template:
+    metadata:
+      labels:
+        app: search-service
+        author: ncsa
+    spec:
+      serviceAccountName: app-search-sa
+      containers:
+        - name: app
+          image: 092291409865.dkr.ecr.us-east-1.amazonaws.com/fullstack/generic-microservice-python:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          env:
+            - name: "SERVICE_NAME"
+              value: "search-service"
+            - name: "SERVICE_URI"
+              value: "search-service.app-search.svc.cluster.local:8000"
+            - name: "AUTHORIZED_EXTERNAL_SERVICES"
+              value: "products-service.app-products.svc.cluster.local:8000,orders-service.app-orders.svc.cluster.local:8000"
+        - name: crawler
+          # NOTES: kubectl exec -it $POD -n app-search -c crawler -- sh
+          image: alpine/curl:8.2.1
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c", "--"]
+          args: ["while true; do sleep 30; done;"]
+#---------------------------------------------------------------------------------------------------
+# PRODUCTS-SERVICE
+#---------------------------------------------------------------------------------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: products-service
+  namespace: app-products
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: products-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: products-service
+  namespace: app-products
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: products-service
+  template:
+    metadata:
+      labels:
+        app: products-service
+        author: ncsa
+    spec:
+      serviceAccountName: app-products-sa
+      containers:
+        - name: app
+          image: 092291409865.dkr.ecr.us-east-1.amazonaws.com/fullstack/generic-microservice-python:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          env:
+            - name: "SERVICE_NAME"
+              value: "products-service"
+            - name: "SERVICE_URI"
+              value: "products-service.app-products.svc.cluster.local:8000"
+            - name: "AUTHORIZED_EXTERNAL_SERVICES"
+              value: ""
+        - name: crawler
+          # NOTES: kubectl exec -it $POD -n app-products -c crawler -- sh
+          image: alpine/curl:8.2.1
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c", "--"]
+          args: ["while true; do sleep 30; done;"]
+#---------------------------------------------------------------------------------------------------
+# IDENTITY-SERVICE
+#---------------------------------------------------------------------------------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-service
+  namespace: app-identity
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: identity-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-service
+  namespace: app-identity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identity-service
+  template:
+    metadata:
+      labels:
+        app: identity-service
+        author: ncsa
+    spec:
+      serviceAccountName: app-identity-sa
+      containers:
+        - name: app
+          image: 092291409865.dkr.ecr.us-east-1.amazonaws.com/fullstack/generic-microservice-python:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          env:
+            - name: "SERVICE_NAME"
+              value: "identity-service"
+            - name: "SERVICE_URI"
+              value: "identity-service.app-identity.svc.cluster.local:8000"
+            - name: "AUTHORIZED_EXTERNAL_SERVICES"
+              value: ""
+        - name: crawler
+          # NOTES: kubectl exec -it $POD -n app-identity -c crawler -- sh
+          image: alpine/curl:8.2.1
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c", "--"]
+          args: ["while true; do sleep 30; done;"]
+#---------------------------------------------------------------------------------------------------
+# FRONTENDPROXY-SERVICE
+#---------------------------------------------------------------------------------------------------
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontendproxy-service-ingress
+  namespace: app-frontend
+  annotations:
+    kubernetes.io/ingress.class: nginx-public
+spec:
+  rules:
+    - host: frontendproxy-service-public.swagwatch.io
+      http:
+        paths:
+          - pathType: Prefix
+            backend:
+              service:
+                name: frontendproxy-service
+                port:
+                  number: 80
+            path: /
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontendproxy-service
+  namespace: app-frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: frontendproxy-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontendproxy-service
+  namespace: app-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontendproxy-service
+  template:
+    metadata:
+      labels:
+        app: frontendproxy-service
+        author: ncsa
+    spec:
+      serviceAccountName: app-frontend-sa
+      containers:
+        - name: app
+          image: 092291409865.dkr.ecr.us-east-1.amazonaws.com/fullstack/generic-microservice-python:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+          # livenessProbe:
+          #   httpGet:
+          #     path: /healthz
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /healthz
+          #     port: http
+          env:
+            - name: "SERVICE_NAME"
+              value: "frontendproxy-service"
+            - name: "SERVICE_URI"
+              value: "frontendproxy-service.app-frontend.svc.cluster.local:8000"
+            - name: "AUTHORIZED_EXTERNAL_SERVICES"
+              value: "identity-service.app-identity.svc.cluster.local:8000,products-service.app-products.svc.cluster.local:8000,search-service.app-search.svc.cluster.local:8000,orders-service.app-orders.svc.cluster.local:8000,payments-service.app-payments.svc.cluster.local:8000,reviews-service.app-reviews.svc.cluster.local:8000"
+        - name: crawler
+          # NOTES: kubectl exec -it $POD -n app-frontend -c crawler -- sh
+          image: alpine/curl:8.2.1
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c", "--"]
+          args: ["while true; do sleep 30; done;"]

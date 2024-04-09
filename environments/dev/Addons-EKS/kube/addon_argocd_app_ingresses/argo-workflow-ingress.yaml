@@ -1,0 +1,21 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argo-workflow-ingress
+  namespace: argo
+  annotations:
+    kubernetes.io/ingress.class: nginx-public
+spec:
+  rules:
+    # REPLACE WITH REAL PUBLIC DOMAIN
+    - host: argoworkflows.example.com
+      http:
+        paths:
+          - pathType: Prefix
+            backend:
+              service:
+                name: argo-server
+                port:
+                  number: 80
+            path: /

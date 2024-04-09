@@ -1,0 +1,98 @@
+apiVersion: v2
+name: Handle terraform-kubernetes-addons helm chart dependencies update
+version: 1.0.0
+dependencies:
+  - name: datadog
+    version: 3.33.5
+    repository: https://helm.datadoghq.com
+  - name: ingress-nginx
+    version: 4.7.1
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: istio-base
+    version: 1.13.5
+    repository: https://istio-release.storage.googleapis.com/charts
+  - name: istiod
+    version: 1.13.5
+    repository: https://istio-release.storage.googleapis.com/charts
+  - name: istio-cni
+    version: 1.13.5
+    repository: https://istio-release.storage.googleapis.com/charts
+  - name: argo-cd
+    version: 0.1.5
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: argo-rollouts
+    version: 0.1.2
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: argo-events
+    version: 0.2.1
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: argo-workflows
+    version: 0.3.0
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: nvidia-device-plugin
+    version: 0.14.1
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: aws-ebs-csi-driver
+    version: 2.23.1
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: aws-efs-csi-driver
+    version: 2.5.0
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: karpenter
+    version: 0.31.0
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: kuberay-operator
+    version: 0.6.0
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: ray-cluster
+    version: 0.5.0
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: jupyterhub
+    version: 3.1.0
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: external-dns
+    version: 0.1.1
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: internal-dns
+    version: 0.1.1
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: cert-manager
+    version: 1.13.1
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: secrets-store-csi-driver
+    version: 1.2.4
+    repository: https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
+  - name: aws-secrets-manager
+    version: 0.1.0
+    repository: https://aws.github.io/secrets-store-csi-driver-provider-aws
+  - name: aws-load-balancer-controller
+    version: 0.1.0
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: prometheus
+    version: 25.1.0
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: opencost
+    version: 1.106.2
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: cilium
+    version: 1.15.0
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: appmesh-controller
+    version: 1.12.7
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: appmesh-spire-agent
+    version: 1.0.7
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: appmesh-spire-server
+    version: 1.0.7
+    repository: https://vgreenncsa.github.io/infra-helm-charts
+  - name: grafana
+    version: 6.44.7
+    repository: https://grafana.github.io/helm-charts
+  - name: loki-stack
+    version: 2.8.7
+    repository: https://grafana.github.io/helm-charts
+  - name: pixie-operator
+    chart: pixie-operator-chart
+    version: 0.0.35
+    repository: https://pixie-operator-charts.storage.googleapis.com

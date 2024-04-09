@@ -1,0 +1,36 @@
+---
+# Source: r-app/templates/application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: team-black-development-apps
+  namespace: argo-cd
+  # Add this finalizer ONLY if you want these to cascade delete.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  # Add labels to your application object.
+  labels:
+    name: team-black-development-apps
+spec:
+  project: team-black-development-app-specs
+  source:
+    repoURL: https://github.com/your-organization/your-mono-repository.git
+    targetRevision: HEAD
+    path: teams/team-black/environments/development
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: team-black
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+    - Validate=true
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

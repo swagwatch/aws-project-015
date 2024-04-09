@@ -1,0 +1,21 @@
+# Default values for external-dns.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: k8s.gcr.io/external-dns/external-dns
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "v0.11.0"
+
+domainFilter: ""
+
+provider: "aws"
+
+awsZoneType: "public"
+
+ingressClass: "nginx-public"
+
+awsRegion: "us-east-1"
