@@ -34,7 +34,7 @@ output "addon_migrate_from_vpc_cni_to_cilium_pass_2" {
 output "addon_ebs_csi" {
   value = {
     dev-0001 = {
-      addon_enabled = false
+      addon_enabled = true
     }
   }
 }

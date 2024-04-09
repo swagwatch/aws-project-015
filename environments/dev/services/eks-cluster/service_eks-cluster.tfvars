@@ -44,7 +44,7 @@ addon_cilium_cni_enabled = true
 
 addon_ekscore_enabled = true
 
-addon_storage_enabled = false
+addon_storage_enabled = true
 
 addon_networking_enabled = false
 
