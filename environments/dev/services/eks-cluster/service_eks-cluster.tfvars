@@ -40,7 +40,7 @@ cert_manager_registered_email = "cloud.native.system@gmail.com"
 
 # CLUSTER ADDONS
 
-addon_cilium_cni_enabled = false
+addon_cilium_cni_enabled = true
 
 addon_ekscore_enabled = false
 
